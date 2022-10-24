@@ -14,28 +14,25 @@ namespace dae
 	{
 		Camera() = default;
 
-		Camera(const Vector3& _origin, float _fovAngle):
-			origin{_origin},
-			fovAngle{_fovAngle}
+		Camera(const Vector3& _origin, float _fovAngle) :
+			origin{ _origin },
+			fovAngle{ _fovAngle }
 		{
 		}
 
 		bool hasMoved{ false };
 
 		Vector3 origin{};
-		float fovAngle{90.f};
-
-		float movementSpeed{ 5.f };
-		float rotationSpeed{ 0.5f };
+		float fovAngle{ 90.f };
 
 		Vector3 forward{ Vector3::UnitZ };
 		Vector3 up{ Vector3::UnitY };
 		Vector3 right{ Vector3::UnitX };
 
-		float totalPitch{0.f};
-		float totalYaw{0.f};
+		float totalPitch{ 0.f };
+		float totalYaw{ 0.f };
 
-		Matrix cameraToWorld{};
+		Matrix cameraToWorld;
 
 		Matrix CalculateCameraToWorld()
 		{
@@ -61,8 +58,19 @@ namespace dae
 		{
 			const float deltaTime = pTimer->GetElapsed();
 
+			float movementSpeed{ 5.f };
+			float rotationSpeed{ 0.5f };
+
 			//Keyboard Input
 			const uint8_t* pKeyboardState = SDL_GetKeyboardState(nullptr);
+
+			if (pKeyboardState[SDL_SCANCODE_LSHIFT])
+			{
+				const float factor{ 4.f };
+
+				movementSpeed *= factor;
+				rotationSpeed *= factor;
+			}
 
 			if (pKeyboardState[SDL_SCANCODE_W])
 			{
@@ -86,6 +94,18 @@ namespace dae
 			{
 				origin -= right * movementSpeed * deltaTime;
 				hasMoved = true;
+			}
+
+			if (pKeyboardState[SDL_SCANCODE_LEFT])
+			{
+				fovAngle -= movementSpeed * deltaTime;
+				fovAngle = std::max(fovAngle, 1.f);
+			}
+
+			if (pKeyboardState[SDL_SCANCODE_RIGHT])
+			{
+				fovAngle += movementSpeed * deltaTime;
+				fovAngle = std::min(fovAngle, 179.f);
 			}
 
 			//Mouse Input

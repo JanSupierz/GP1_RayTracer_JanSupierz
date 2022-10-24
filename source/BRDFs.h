@@ -11,18 +11,15 @@ namespace dae
 		 * \param cd Diffuse Color
 		 * \return Lambert Diffuse Color
 		 */
+
 		static ColorRGB Lambert(float kd, const ColorRGB& cd)
 		{
-			//todo: W3
-			assert(false && "Not Implemented Yet");
-			return {};
+			return { ColorRGB{ 1.f,1.f,1.f } * ((kd * cd) / PI) };
 		}
 
 		static ColorRGB Lambert(const ColorRGB& kd, const ColorRGB& cd)
 		{
-			//todo: W3
-			assert(false && "Not Implemented Yet");
-			return {};
+			return { ColorRGB{ 1.f,1.f,1.f } * ((kd * cd) / PI) };
 		}
 
 		/**
@@ -36,9 +33,9 @@ namespace dae
 		 */
 		static ColorRGB Phong(float ks, float exp, const Vector3& l, const Vector3& v, const Vector3& n)
 		{
-			//todo: W3
-			assert(false && "Not Implemented Yet");
-			return {};
+			Vector3 reflection{ l - (2.f * std::max(Vector3::Dot(n,l),0.f) * n) };
+			float cosAlpha{ std::max(Vector3::Dot(reflection,v),0.f) };
+			return { ColorRGB{1.f,1.f,1.f}* std::max(0.f,ks * powf(cosAlpha,exp)) }; //Branchless programming
 		}
 
 		/**
@@ -50,9 +47,9 @@ namespace dae
 		 */
 		static ColorRGB FresnelFunction_Schlick(const Vector3& h, const Vector3& v, const ColorRGB& f0)
 		{
-			//todo: W3
-			assert(false && "Not Implemented Yet");
-			return {};
+			const float factor{ 1 - std::max(Vector3::Dot(v,h),0.f) };
+
+			return { f0 + ((ColorRGB{1.f,1.f,1.f} - f0) * (factor * factor * factor * factor * factor)) };
 		}
 
 		/**
@@ -64,9 +61,11 @@ namespace dae
 		 */
 		static float NormalDistribution_GGX(const Vector3& n, const Vector3& h, float roughness)
 		{
-			//todo: W3
-			assert(false && "Not Implemented Yet");
-			return {};
+			const float aSquared{ roughness * roughness * roughness * roughness };
+			const float dotProduct{ std::max(Vector3::Dot(n, h),0.f) };
+			const float factor{ (dotProduct * dotProduct * (aSquared - 1)) + 1 };
+
+			return { aSquared / (PI * factor * factor) };
 		}
 
 
@@ -79,9 +78,12 @@ namespace dae
 		 */
 		static float GeometryFunction_SchlickGGX(const Vector3& n, const Vector3& v, float roughness)
 		{
-			//todo: W3
-			assert(false && "Not Implemented Yet");
-			return {};
+			//Direct lightning
+			const float factor{ (roughness * roughness) + 1 };
+			const float k{ (factor * factor) / 8.f };
+			const float dotProduct{ std::max(Vector3::Dot(n, v),0.f) };
+
+			return { dotProduct / ((dotProduct * (1 - k)) + k) };
 		}
 
 		/**
@@ -94,9 +96,7 @@ namespace dae
 		 */
 		static float GeometryFunction_Smith(const Vector3& n, const Vector3& v, const Vector3& l, float roughness)
 		{
-			//todo: W3
-			assert(false && "Not Implemented Yet");
-			return {};
+			return { GeometryFunction_SchlickGGX(n, v,roughness) * GeometryFunction_SchlickGGX(n, l, roughness) };
 		}
 
 	}

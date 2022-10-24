@@ -52,21 +52,25 @@ void Renderer::Render(Scene* pScene) const
 
 			if (closestHit.didHit)
 			{
-				finalColor = materials[closestHit.materialIndex]->Shade();
-	
-
 				for (const Light& light : pScene->GetLights())
 				{
 					Ray lightRay{};
-					lightRay.origin = closestHit.origin + closestHit.normal * lightRay.min;
+					lightRay.origin = closestHit.origin + closestHit.normal * 0.0002f;
 					lightRay.direction = LightUtils::GetDirectionToLight(light, lightRay.origin);
 					lightRay.max = lightRay.direction.Normalize();
 
-					if (pScene->DoesHit(lightRay))
+					if (m_ShadowsEnabled)
 					{
-						finalColor *= 0.5f;
+						if (!pScene->DoesHit(lightRay))
+						{
+							CalculateFinalColor(light, lightRay.direction, closestHit, materials, viewRay.direction, finalColor);
+						}
 					}
-				}		
+					else
+					{
+						CalculateFinalColor(light, lightRay.direction, closestHit, materials, viewRay.direction, finalColor);
+					}
+				}
 			}
 
 			//Update Color in Buffer
@@ -87,4 +91,48 @@ void Renderer::Render(Scene* pScene) const
 bool Renderer::SaveBufferToImage() const
 {
 	return SDL_SaveBMP(m_pBuffer, "RayTracing_Buffer.bmp");
+}
+
+void dae::Renderer::CycleLightingMode()
+{
+	if (m_CurrentLightingMode != LightingMode::Combined)
+	{
+		m_CurrentLightingMode = static_cast<LightingMode>(static_cast<int>(m_CurrentLightingMode) + 1);
+	}
+	else
+	{
+		m_CurrentLightingMode = LightingMode::ObservedArea;
+	}
+}
+
+void Renderer::CalculateFinalColor(const Light& light, const Vector3& lightRayDirection, const HitRecord& closestHit, const std::vector<Material*>& materials, const Vector3& viewRayDirection, ColorRGB& finalColor) const
+{
+	float observedArea{ Vector3::Dot(closestHit.normal,lightRayDirection) };
+
+
+		switch (m_CurrentLightingMode)
+		{
+
+		case LightingMode::ObservedArea:
+			if (observedArea > 0.f)
+			{
+				finalColor += ColorRGB{ 1.f,1.f,1.f } * observedArea;
+			}
+			break;
+
+		case LightingMode::Radiance:
+			finalColor += LightUtils::GetRadiance(light, closestHit.origin);
+			break;
+
+		case LightingMode::BRDF:
+				finalColor += materials[closestHit.materialIndex]->Shade(closestHit, lightRayDirection, viewRayDirection);
+			break;
+
+		case LightingMode::Combined:
+			if (observedArea > 0.f)
+			{
+				finalColor += LightUtils::GetRadiance(light, closestHit.origin) * materials[closestHit.materialIndex]->Shade(closestHit, lightRayDirection, viewRayDirection) * observedArea;
+			}
+			break;
+		}
 }
