@@ -149,8 +149,6 @@ namespace dae {
 		AddPlane({ 0.f, -75.f, 0.f }, { 0.f, 1.f,0.f }, matId_Solid_Yellow);
 		AddPlane({ 0.f, 75.f, 0.f }, { 0.f, -1.f,0.f }, matId_Solid_Yellow);
 		AddPlane({ 0.f, 0.f, 125.f }, { 0.f, 0.f,-1.f }, matId_Solid_Magenta);
-
-		//AddPlane({ 0.f, 75.f, 0.f }, { 0.f, 0.7071f,0.7071f }, matId_Solid_Yellow);
 	}
 #pragma endregion
 
@@ -195,8 +193,8 @@ namespace dae {
 		m_Camera.fovAngle = 45.f;
 
 		//Lambert Materials
-		const auto matLambert_Red = AddMaterial(new Material_Lambert{ colors::Red, 1.f });
-		const auto matLambert_Blue = AddMaterial(new Material_Lambert{ colors::Blue, 1.f });
+		//const auto matLambert_Red = AddMaterial(new Material_Lambert{ colors::Red, 1.f });
+		//const auto matLambert_Blue = AddMaterial(new Material_Lambert{ colors::Blue, 1.f });
 		const auto matLambert_Yellow = AddMaterial(new Material_Lambert{ colors::Yellow, 1.f });
 
 		//Phong Material
@@ -239,9 +237,9 @@ namespace dae {
 		AddPlane(Vector3{ -5.f,0.f,0.f }, Vector3{ 1.f,0.f,0.f }, matLambert_GrayBlue); //Left
 
 		//Temporary Lambert-Phong Spheres and Materials
-		const auto matLambertPhong1 = AddMaterial(new Material_LambertPhong(colors::Blue, 0.5f, 0.5f, 3.f));
-		const auto matLambertPhong2 = AddMaterial(new Material_LambertPhong(colors::Blue, 0.5f, 0.5f, 15.f));
-		const auto matLambertPhong3 = AddMaterial(new Material_LambertPhong(colors::Blue, 0.5f, 0.5f, 50.f));
+		//const auto matLambertPhong1 = AddMaterial(new Material_LambertPhong(colors::Blue, 0.5f, 0.5f, 3.f));
+		//const auto matLambertPhong2 = AddMaterial(new Material_LambertPhong(colors::Blue, 0.5f, 0.5f, 15.f));
+		//const auto matLambertPhong3 = AddMaterial(new Material_LambertPhong(colors::Blue, 0.5f, 0.5f, 50.f));
 		
 		//AddSphere(Vector3{ -1.75f,1.f,0.f }, 0.75f, matLambertPhong1);
 		//AddSphere(Vector3{ 0.f,1.f,0.f }, 0.75f, matLambertPhong2);
@@ -334,6 +332,8 @@ namespace dae {
 
 		//TriangleMesh
 		const Triangle baseTriangle{ Vector3{-0.75f, 1.5f, 0.f}, Vector3{.75f, 0.f, 0.f}, Vector3{-.75f, 0.f, 0.f} };
+
+		m_pMeshes.resize(3);
 
 		m_pMeshes[0] = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
 		m_pMeshes[0]->AppendTriangle(baseTriangle, true);

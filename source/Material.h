@@ -34,7 +34,7 @@ namespace dae
 	class Material_SolidColor final : public Material
 	{
 	public:
-		Material_SolidColor(const ColorRGB& color): m_Color(color)
+		explicit Material_SolidColor(const ColorRGB& color): m_Color(color)
 		{
 		}
 
@@ -98,7 +98,7 @@ namespace dae
 	class Material_CookTorrence final : public Material
 	{
 	public:
-		Material_CookTorrence(const ColorRGB& albedo, float metalness, float roughness):
+		Material_CookTorrence(const ColorRGB& albedo, const float metalness, const float roughness):
 			m_Albedo(albedo), m_Metalness(metalness), m_Roughness(roughness)
 		{
 		}
@@ -106,18 +106,13 @@ namespace dae
 		ColorRGB Shade(const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {}) override
 		{
 			const Vector3 halfVector{ (-v + l) / ((-v + l).Magnitude()) };
+			const ColorRGB fresnel{ BRDF::FresnelFunction_Schlick(halfVector,-v,((m_Metalness == 0) ? (ColorRGB{0.04f,0.04f,0.04f}) : m_Albedo)) };
 
-			const ColorRGB f0{ ((m_Metalness == 0) ? (ColorRGB{1.f,1.f,1.f}*0.04f) : m_Albedo) };
-
-			const ColorRGB fresnel{ BRDF::FresnelFunction_Schlick(halfVector,-v,f0) };
-			const float normalDistribution{ BRDF::NormalDistribution_GGX(hitRecord.normal, halfVector, m_Roughness) };
-			const float geometry{ BRDF::GeometryFunction_Smith(hitRecord.normal,-v,l,m_Roughness) };
-
-			ColorRGB specular{ fresnel * normalDistribution * geometry };
-			specular /= (4 * Vector3::Dot(-v, hitRecord.normal) * Vector3::Dot(l, hitRecord.normal));
-			const ColorRGB kd{ (m_Metalness == 0 ? ColorRGB{ 1.f,1.f,1.f } - fresnel : ColorRGB{0.f,0.f,0.f}) };
-
-			return { BRDF::Lambert(kd,m_Albedo) + specular };
+			return 
+			{ 
+				BRDF::Lambert((m_Metalness == 0 ? ColorRGB{ 1.f,1.f,1.f } - fresnel : ColorRGB{0.f,0.f,0.f}),m_Albedo) + 
+				(fresnel * BRDF::NormalDistribution_GGX(hitRecord.normal, halfVector, m_Roughness) * BRDF::GeometryFunction_Smith(hitRecord.normal,-v,l,m_Roughness)) * (1 / (4 * Vector3::Dot(-v, hitRecord.normal) * Vector3::Dot(l, hitRecord.normal)))
+			};
 		}
 
 	private:

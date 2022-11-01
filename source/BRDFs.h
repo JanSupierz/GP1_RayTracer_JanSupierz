@@ -12,14 +12,14 @@ namespace dae
 		 * \return Lambert Diffuse Color
 		 */
 
-		static ColorRGB Lambert(float kd, const ColorRGB& cd)
+		static ColorRGB Lambert(const float kd, const ColorRGB& cd)
 		{
-			return { ColorRGB{ 1.f,1.f,1.f } * ((kd * cd) / PI) };
+			return { (kd * cd) / PI };
 		}
 
 		static ColorRGB Lambert(const ColorRGB& kd, const ColorRGB& cd)
 		{
-			return { ColorRGB{ 1.f,1.f,1.f } * ((kd * cd) / PI) };
+			return { (kd * cd) / PI };
 		}
 
 		/**
@@ -31,11 +31,9 @@ namespace dae
 		 * \param n Normal of the Surface
 		 * \return Phong Specular Color
 		 */
-		static ColorRGB Phong(float ks, float exp, const Vector3& l, const Vector3& v, const Vector3& n)
+		static ColorRGB Phong(const float ks,const float exp, const Vector3& l, const Vector3& v, const Vector3& n)
 		{
-			Vector3 reflection{ l - (2.f * std::max(Vector3::Dot(n,l),0.f) * n) };
-			float cosAlpha{ std::max(Vector3::Dot(reflection,v),0.f) };
-			return { ColorRGB{1.f,1.f,1.f}* std::max(0.f,ks * powf(cosAlpha,exp)) };
+			return { ColorRGB{1.f,1.f,1.f}* std::max(0.f,ks * powf(std::max(Vector3::Dot(l - (2.f * std::max(Vector3::Dot(n,l),0.f) * n),v),0.f),exp)) };
 		}
 
 		/**
@@ -59,13 +57,13 @@ namespace dae
 		 * \param roughness Roughness of the material
 		 * \return BRDF Normal Distribution Term using Trowbridge-Reitz GGX
 		 */
-		static float NormalDistribution_GGX(const Vector3& n, const Vector3& h, float roughness)
+		static float NormalDistribution_GGX(const Vector3& n, const Vector3& h, const float roughness)
 		{
 			const float aSquared{ roughness * roughness * roughness * roughness };
 			const float dotProduct{ std::max(Vector3::Dot(n, h),0.f) };
 			const float factor{ (dotProduct * dotProduct * (aSquared - 1)) + 1 };
 
-			return { aSquared / (PI * factor * factor) };
+			return aSquared / (PI * factor * factor);
 		}
 
 
@@ -76,14 +74,14 @@ namespace dae
 		 * \param roughness Roughness of the material
 		 * \return BRDF Geometry Term using SchlickGGX
 		 */
-		static float GeometryFunction_SchlickGGX(const Vector3& n, const Vector3& v, float roughness)
+		static float GeometryFunction_SchlickGGX(const Vector3& n, const Vector3& v, const float roughness)
 		{
 			//Direct lightning
 			const float factor{ (roughness * roughness) + 1 };
 			const float k{ (factor * factor) / 8.f };
 			const float dotProduct{ std::max(Vector3::Dot(n, v),0.f) };
 
-			return { dotProduct / ((dotProduct * (1 - k)) + k) };
+			return dotProduct / ((dotProduct * (1 - k)) + k);
 		}
 
 		/**
@@ -94,9 +92,9 @@ namespace dae
 		 * \param roughness Roughness of the material
 		 * \return BRDF Geometry Term using Smith (> SchlickGGX(n,v,roughness) * SchlickGGX(n,l,roughness))
 		 */
-		static float GeometryFunction_Smith(const Vector3& n, const Vector3& v, const Vector3& l, float roughness)
+		static float GeometryFunction_Smith(const Vector3& n, const Vector3& v, const Vector3& l, const float roughness)
 		{
-			return { GeometryFunction_SchlickGGX(n, v,roughness) * GeometryFunction_SchlickGGX(n, l, roughness) };
+			return  GeometryFunction_SchlickGGX(n, v, roughness) * GeometryFunction_SchlickGGX(n, l, roughness);
 		}
 
 	}

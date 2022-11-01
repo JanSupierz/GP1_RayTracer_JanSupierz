@@ -11,6 +11,7 @@ namespace dae
 	{
 		Vector3 origin{};
 		float radius{};
+
 		unsigned char materialIndex{ 0 };
 	};
 
@@ -109,15 +110,17 @@ namespace dae
 
 		void AppendTriangle(const Triangle& triangle, bool ignoreTransformUpdate = false)
 		{
-			int startIndex = static_cast<int>(positions.size());
+			auto startIndex = static_cast<int>(positions.size());
 
 			positions.push_back(triangle.v0);
 			positions.push_back(triangle.v1);
 			positions.push_back(triangle.v2);
 
 			indices.push_back(startIndex);
-			indices.push_back(++startIndex);
-			indices.push_back(++startIndex);
+			++startIndex;
+			indices.push_back(startIndex);
+			++startIndex;
+			indices.push_back(startIndex);
 
 			normals.push_back(triangle.normal);
 

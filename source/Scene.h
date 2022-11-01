@@ -52,7 +52,6 @@ namespace dae
 		std::vector<Material*> m_Materials{};
 
 		////Temp (individual Triangle Testing)
-		//std::vector<Triangle> m_Triangles{};
 
 		Camera m_Camera{};
 
@@ -158,7 +157,7 @@ namespace dae
 		void Update(Timer* pTimer) override;
 
 	private:
-		TriangleMesh* m_pMeshes[3]{};
+		std::vector<TriangleMesh*> m_pMeshes{};
 	};
 
 	class Scene_W4_BunnyScene final : public Scene

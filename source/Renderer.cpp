@@ -32,9 +32,9 @@ Renderer::Renderer(SDL_Window * pWindow) :
 
 void Renderer::Render(Scene* pScene) const
 {
-	Camera& camera = pScene->GetCamera();
-	auto& materials = pScene->GetMaterials();
-	auto& lights = pScene->GetLights();
+	const Camera& camera = pScene->GetCamera();
+	const auto& materials = pScene->GetMaterials();
+	const auto& lights = pScene->GetLights();
 
 	const float fieldOfView{ tanf(camera.fovAngle*TO_RADIANS / 2.f) };
 
@@ -85,9 +85,9 @@ void Renderer::Render(Scene* pScene) const
 
 #else
 	//Synchronous logic
-	for (uint32_t i{ 0 }; i < numPixels; ++i)
+	for (uint32_t i{ 0 }; i < m_NumberOfPixels; ++i)
 	{
-		RenderPixel(pScene, i, fieldOfView,, camera, lights, materials);
+		RenderPixel(pScene, i, fieldOfView, camera, lights, materials, viewRay);
 	}
 #endif
 
@@ -100,11 +100,12 @@ void dae::Renderer::RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldO
 {
 	const uint32_t px{ pixelIndex % m_Width }, py{ pixelIndex / m_Width };
 
-	Ray viewRay{ camera.origin ,Vector3::Zero };
-	ColorRGB finalColor{};
+	ColorRGB finalColor{ dae::colors::Black };
 
 	const float cx{ (((2.f * (px + 0.5f)) / static_cast<float>(m_Width)) - 1) * m_AspectRatio * fieldOfView };
 	const float cy{ (1 - ((2.f * (py + 0.5f)) / static_cast<float>(m_Height))) * fieldOfView };
+
+	Ray viewRay{ camera.origin ,Vector3::Zero };
 
 	viewRay.direction = (cx * Vector3::UnitX) + (cy * Vector3::UnitY) + Vector3::UnitZ;
 	viewRay.direction.Normalize();
@@ -112,8 +113,6 @@ void dae::Renderer::RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldO
 
 	HitRecord closestHit{};
 	pScene->GetClosestHit(viewRay, closestHit);
-
-	finalColor = dae::colors::Black;
 
 	if (closestHit.didHit)
 	{
