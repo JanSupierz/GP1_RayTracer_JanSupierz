@@ -15,7 +15,7 @@ namespace dae
 	struct ColorRGB;
 
 	class Material;
-
+	struct Camera;
 	class Scene;
 
 	class Renderer final
@@ -30,6 +30,7 @@ namespace dae
 		Renderer& operator=(Renderer&&) noexcept = delete;
 
 		void Render(Scene* pScene) const;
+
 		bool SaveBufferToImage() const;
 		
 		void CycleLightingMode();
@@ -43,13 +44,14 @@ namespace dae
 
 		int m_Width{};
 		int m_Height{};
+		uint32_t  m_NumberOfPixels{};
+		float m_AspectRatio{};
 
 		enum class LightingMode
 		{
 			ObservedArea, //Lambert cosine law
 			Radiance, //Incident radiance
 			BRDF, //Scattering of the light
-			//WithoutShade,
 			Combined
 		};
 
@@ -57,5 +59,6 @@ namespace dae
 		bool m_ShadowsEnabled{ true };
 
 		void CalculateFinalColor(const Light& light, const Vector3& lightRayDirection, const HitRecord& closestHit, const std::vector<Material*>& materials, const Vector3& viewRayDirection, ColorRGB& finalColor) const;
+		void RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldOfView, const Camera& camera, const std::vector<Light>& lights, const std::vector<Material*>& materials) const;
 	};
 }

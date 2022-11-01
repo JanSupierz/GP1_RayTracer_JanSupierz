@@ -10,7 +10,14 @@
 #include "Scene.h"
 #include "Utils.h"
 
+#include <thread>
+#include <future> //Async
+#include <ppl.h>
+
 using namespace dae;
+
+//#define ASYNC
+#define PARALLEL_FOR
 
 Renderer::Renderer(SDL_Window * pWindow) :
 	m_pWindow(pWindow),
@@ -19,6 +26,8 @@ Renderer::Renderer(SDL_Window * pWindow) :
 	//Initialize
 	SDL_GetWindowSize(pWindow, &m_Width, &m_Height);
 	m_pBufferPixels = static_cast<uint32_t*>(m_pBuffer->pixels);
+	m_AspectRatio = static_cast<float>(m_Width) / static_cast<float>(m_Height);
+	m_NumberOfPixels = m_Width * m_Height;
 }
 
 void Renderer::Render(Scene* pScene) const
@@ -28,64 +37,114 @@ void Renderer::Render(Scene* pScene) const
 	auto& lights = pScene->GetLights();
 
 	const float fieldOfView{ tanf(camera.fovAngle*TO_RADIANS / 2.f) };
-	const float aspectRatio{ static_cast<float>(m_Width) / static_cast<float>(m_Height) };
 
-	Ray viewRay{ camera.origin ,Vector3::Zero };
-	ColorRGB finalColor{};
+#if defined(ASYNC)
+	//Async logic
+	const uint32_t numCores = std::thread::hardware_concurrency();
+	std::vector<std::future<void>> async_futures{};
 
-	for (int px{}; px < m_Width; ++px)
+	const uint32_t numPixelsPerTask = numPixels / numCores;
+	uint32_t numUnassignedPixels = numPixels % numCores;
+	uint32_t currentPixelIndex{ 0 };
+
+	for (uint32_t coreId{ 0 }; coreId < numCores; ++coreId)
 	{
-		for (int py{}; py < m_Height; ++py)
+		uint32_t taskSize{ numPixelsPerTask };
+		if (numUnassignedPixels > 0)
 		{
-			const float cx{ (((2.f * (px + 0.5f)) / static_cast<float>(m_Width)) - 1) * aspectRatio * fieldOfView };
-			const float cy{ (1 - ((2.f * (py + 0.5f)) / static_cast<float>(m_Height))) * fieldOfView };
-
-			viewRay.direction = (cx * Vector3::UnitX) + (cy * Vector3::UnitY) + Vector3::UnitZ;
-			viewRay.direction.Normalize();
-			viewRay.direction = camera.cameraToWorld.TransformVector(viewRay.direction);
-
-			
-			HitRecord closestHit{};
-			pScene->GetClosestHit(viewRay, closestHit);
-
-			finalColor = dae::colors::Black;
-
-			if (closestHit.didHit)
-			{
-				for (const Light& light : pScene->GetLights())
-				{
-					Ray lightRay{};
-					lightRay.origin = closestHit.origin + closestHit.normal * 0.0002f;
-					lightRay.direction = LightUtils::GetDirectionToLight(light, lightRay.origin);
-					lightRay.max = lightRay.direction.Normalize();
-
-					if (m_ShadowsEnabled)
-					{
-						if (!pScene->DoesHit(lightRay))
-						{
-							CalculateFinalColor(light, lightRay.direction, closestHit, materials, viewRay.direction, finalColor);
-						}
-					}
-					else
-					{
-						CalculateFinalColor(light, lightRay.direction, closestHit, materials, viewRay.direction, finalColor);
-					}
-				}
-			}
-
-			//Update Color in Buffer
-			finalColor.MaxToOne();
-
-			m_pBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBuffer->format,
-			static_cast<uint8_t>(finalColor.r * 255),
-			static_cast<uint8_t>(finalColor.g * 255),
-			static_cast<uint8_t>(finalColor.b * 255));
+			++taskSize;
+			--numUnassignedPixels;
 		}
+
+		async_futures.push_back(std::async(std::launch::async, [=, this]
+			{
+				const uint32_t pixelIndexEnd = currentPixelIndex + taskSize;
+				for (uint32_t pixelIndex{ currentPixelIndex }; pixelIndex < pixelIndexEnd; ++pixelIndex)
+				{
+					RenderPixel(pScene, pixelIndex, fieldOfView, camera, lights, materials);
+				}
+				
+			})
+		);
+
+		currentPixelIndex += taskSize;
 	}
+
+	//Wait for all tasks
+	for (const std::future<void>& f : async_futures)
+	{
+		f.wait();
+	}
+
+#elif defined(PARALLEL_FOR)
+	//Parallel For logic
+	concurrency::parallel_for(0u, m_NumberOfPixels, [=, this](int i)
+	{
+			RenderPixel(pScene, i, fieldOfView, camera, lights, materials);
+	});
+
+#else
+	//Synchronous logic
+	for (uint32_t i{ 0 }; i < numPixels; ++i)
+	{
+		RenderPixel(pScene, i, fieldOfView,, camera, lights, materials);
+	}
+#endif
 
 	//@END
 	//Update SDL Surface
 	SDL_UpdateWindowSurface(m_pWindow);
+}
+
+void dae::Renderer::RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldOfView, const Camera& camera, const std::vector<Light>& lights, const std::vector<Material*>& materials) const
+{
+	const uint32_t px{ pixelIndex % m_Width }, py{ pixelIndex / m_Width };
+
+	Ray viewRay{ camera.origin ,Vector3::Zero };
+	ColorRGB finalColor{};
+
+	const float cx{ (((2.f * (px + 0.5f)) / static_cast<float>(m_Width)) - 1) * m_AspectRatio * fieldOfView };
+	const float cy{ (1 - ((2.f * (py + 0.5f)) / static_cast<float>(m_Height))) * fieldOfView };
+
+	viewRay.direction = (cx * Vector3::UnitX) + (cy * Vector3::UnitY) + Vector3::UnitZ;
+	viewRay.direction.Normalize();
+	viewRay.direction = camera.cameraToWorld.TransformVector(viewRay.direction);
+
+	HitRecord closestHit{};
+	pScene->GetClosestHit(viewRay, closestHit);
+
+	finalColor = dae::colors::Black;
+
+	if (closestHit.didHit)
+	{
+		Ray lightRay{ closestHit.origin + closestHit.normal * 0.0002f };
+
+		for (const Light& light : lights)
+		{
+			lightRay.direction = LightUtils::GetDirectionToLight(light, lightRay.origin);
+			lightRay.max = lightRay.direction.Normalize();
+
+			if (m_ShadowsEnabled) //als de schaduwen aan staan
+			{
+				if (!pScene->DoesHit(lightRay)) //en als er niets zit tussen de lichtbron en deze pixel
+				{
+					CalculateFinalColor(light, lightRay.direction, closestHit, materials, viewRay.direction, finalColor); //dan berekenen we licht
+				}
+			}
+			else
+			{
+				CalculateFinalColor(light, lightRay.direction, closestHit, materials, viewRay.direction, finalColor);
+			}
+		}
+	}
+
+	//Update Color in Buffer
+	finalColor.MaxToOne();
+
+	m_pBufferPixels[px + (py * m_Width)] = SDL_MapRGB(m_pBuffer->format,
+		static_cast<uint8_t>(finalColor.r * 255),
+		static_cast<uint8_t>(finalColor.g * 255),
+		static_cast<uint8_t>(finalColor.b * 255));
 }
 
 bool Renderer::SaveBufferToImage() const

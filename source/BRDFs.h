@@ -35,7 +35,7 @@ namespace dae
 		{
 			Vector3 reflection{ l - (2.f * std::max(Vector3::Dot(n,l),0.f) * n) };
 			float cosAlpha{ std::max(Vector3::Dot(reflection,v),0.f) };
-			return { ColorRGB{1.f,1.f,1.f}* std::max(0.f,ks * powf(cosAlpha,exp)) }; //Branchless programming
+			return { ColorRGB{1.f,1.f,1.f}* std::max(0.f,ks * powf(cosAlpha,exp)) };
 		}
 
 		/**

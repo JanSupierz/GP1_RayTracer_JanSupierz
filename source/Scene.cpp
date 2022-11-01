@@ -60,7 +60,7 @@ namespace dae {
 		{
 			if (dae::GeometryUtils::HitTest_TriangleMesh(triangleMesh, ray)) return true;
 		}
-
+	
 		return false;
 	}
 
@@ -71,7 +71,6 @@ namespace dae {
 		s.origin = origin;
 		s.radius = radius;
 		s.materialIndex = materialIndex;
-
 		m_SphereGeometries.emplace_back(s);
 		return &m_SphereGeometries.back();
 	}
@@ -280,29 +279,6 @@ namespace dae {
 		AddPlane(Vector3{ 5.f,0.f,0.f }, Vector3{ -1.f,0.f,0.f }, matLambert_GrayBlue); //RIGHT
 		AddPlane(Vector3{ -5.f,0.f,0.f }, Vector3{ 1.f,0.f,0.f }, matLambert_GrayBlue); //LEFT
 
-		////Triangle (Temp)
-		//auto triangle = Triangle{ {-0.75f,0.5f,0.f},{-0.75,2.f,0.f},{0.75,0.5f,0.f} };
-		//triangle.cullMode = TriangleCullMode::NoCulling;
-		//triangle.materialIndex = matLambert_White;
-
-		//m_Triangles.emplace_back(triangle);
-
-		////Triangle Mesh
-		//const auto triangleMesh = AddTriangleMesh(TriangleCullMode::NoCulling, matLambert_White);
-		//triangleMesh->positions = { {-0.75,-1.f,0.f},{-0.75f,1.f,0.f},{0.75f,1.f,1.f},{0.75f,-1.f,0.f } };
-		//triangleMesh->indices = 
-		//{ 
-		//	0,1,2, //Triangle 1
-		//	0,2,3  //Triangle 2
-		//};
-
-		//triangleMesh->CalculateNormals();
-
-		//triangleMesh->Translate({ 0.f,1.5f,0.f });
-		//triangleMesh->RotateY(45.f);
-
-		//triangleMesh->UpdateTransforms();
-
 		pMesh = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
 		Utils::ParseOBJ("Resources/simple_cube.obj", pMesh->positions, pMesh->normals, pMesh->indices);
 
@@ -359,20 +335,23 @@ namespace dae {
 		//TriangleMesh
 		const Triangle baseTriangle{ Vector3{-0.75f, 1.5f, 0.f}, Vector3{.75f, 0.f, 0.f}, Vector3{-.75f, 0.f, 0.f} };
 
-		m_Meshes[0] = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
-		m_Meshes[0]->AppendTriangle(baseTriangle, true);
-		m_Meshes[0]->Translate({ -1.75f, 4.5f, 0.f });
-		m_Meshes[0]->UpdateTransforms();
+		m_pMeshes[0] = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
+		m_pMeshes[0]->AppendTriangle(baseTriangle, true);
+		m_pMeshes[0]->Translate({ -1.75f, 4.5f, 0.f });
+		m_pMeshes[0]->UpdateAABB();
+		m_pMeshes[0]->UpdateTransforms();
 
-		m_Meshes[1] = AddTriangleMesh(TriangleCullMode::FrontFaceCulling, matLambert_White);
-		m_Meshes[1]->AppendTriangle(baseTriangle, true);
-		m_Meshes[1]->Translate({ 0.f, 4.5f, 0.f });
-		m_Meshes[1]->UpdateTransforms();
+		m_pMeshes[1] = AddTriangleMesh(TriangleCullMode::FrontFaceCulling, matLambert_White);
+		m_pMeshes[1]->AppendTriangle(baseTriangle, true);
+		m_pMeshes[1]->Translate({ 0.f, 4.5f, 0.f });
+		m_pMeshes[1]->UpdateAABB();
+		m_pMeshes[1]->UpdateTransforms();
 
-		m_Meshes[2] = AddTriangleMesh(TriangleCullMode::NoCulling, matLambert_White);
-		m_Meshes[2]->AppendTriangle(baseTriangle, true);
-		m_Meshes[2]->Translate({ 1.75f, 4.5f, 0.f });
-		m_Meshes[2]->UpdateTransforms();
+		m_pMeshes[2] = AddTriangleMesh(TriangleCullMode::NoCulling, matLambert_White);
+		m_pMeshes[2]->AppendTriangle(baseTriangle, true);
+		m_pMeshes[2]->Translate({ 1.75f, 4.5f, 0.f });
+		m_pMeshes[2]->UpdateAABB();
+		m_pMeshes[2]->UpdateTransforms();
 
 		//Lights
 		AddPointLight(Vector3{ 0.f, 5.f, 5.f }, 50.f, ColorRGB{ 1.f, .61f, .45f }); //Back Light
@@ -385,7 +364,7 @@ namespace dae {
 		Scene::Update(pTimer);
 
 		const auto yawAngle = (cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2;
-		for (const auto m : m_Meshes)
+		for (const auto m : m_pMeshes)
 		{
 			m->RotateY(yawAngle);
 			m->UpdateTransforms();
@@ -409,13 +388,13 @@ namespace dae {
 		AddPlane(Vector3{ -5.f, 0.f, 0.f }, Vector3{ 1.f, 0.f, 0.f }, matLambert_GrayBlue); //left
 
 		//Bunny Mesh
-		pMesh = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
+		m_pMesh = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
 
-		Utils::ParseOBJ("Resources/lowpoly_bunny2.obj",pMesh->positions,pMesh->normals,pMesh->indices);
+		Utils::ParseOBJ("Resources/lowpoly_bunny2.obj", m_pMesh->positions, m_pMesh->normals, m_pMesh->indices);
 
-		pMesh->Scale({ 2.f, 2.f, 2.f });
-
-		pMesh->UpdateTransforms();
+		m_pMesh->Scale({ 2.f, 2.f, 2.f });
+		m_pMesh->UpdateAABB();
+		m_pMesh->UpdateTransforms();
 
 		//Lights
 		AddPointLight(Vector3{ 0.f, 5.f, 5.f }, 50.f, ColorRGB{ 1.f, .61f, .45f }); //Back Light
