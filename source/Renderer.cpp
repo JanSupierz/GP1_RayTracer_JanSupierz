@@ -164,7 +164,7 @@ void dae::Renderer::CycleLightingMode()
 
 void Renderer::CalculateFinalColor(const Light& light, const Vector3& lightRayDirection, const HitRecord& closestHit, const std::vector<Material*>& materials, const Vector3& viewRayDirection, ColorRGB& finalColor) const
 {
-	float observedArea{ Vector3::Dot(closestHit.normal,lightRayDirection) };
+	const float observedArea{ Vector3::Dot(closestHit.normal,lightRayDirection) };
 
 		switch (m_CurrentLightingMode)
 		{

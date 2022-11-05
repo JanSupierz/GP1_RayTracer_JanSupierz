@@ -28,7 +28,7 @@ namespace dae {
 
 	void dae::Scene::GetClosestHit(const Ray& ray, HitRecord& closestHit) const
 	{
-		for (const Sphere &sphere : m_SphereGeometries)
+		for (const Sphere& sphere : m_SphereGeometries)
 		{
 			dae::GeometryUtils::HitTest_Sphere(sphere, ray, closestHit);
 		}
@@ -334,25 +334,32 @@ namespace dae {
 		AddSphere(Vector3{ 1.75, 3.f, 0.f }, .75f, matCT_GraySmoothPlastic);
 
 		//TriangleMesh
-		const Triangle baseTriangle{ Vector3{-0.75f, 1.5f, 0.f}, Vector3{.75f, 0.f, 0.f}, Vector3{-.75f, 0.f, 0.f} };
+		const Triangle baseTriangle = { Vector3(-0.75f, 1.5f, 0.0f), Vector3(0.75f, 0.0f, 0.0f), Vector3(-0.75f, 0.0f, 0.0f) };
 
 		m_pMeshes[0] = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
 		m_pMeshes[0]->AppendTriangle(baseTriangle, true);
-		m_pMeshes[0]->Translate({ -1.75f, 4.5f, 0.f });
-		m_pMeshes[0]->UpdateAABB();
+
+		m_pMeshes[0]->CalculateCentroids();
+		m_pMeshes[0]->Translate({ -1.75f, 4.5f, 0.0f });
+
 		m_pMeshes[0]->UpdateTransforms();
+		m_pMeshes[0]->InitBVH();
 
 		m_pMeshes[1] = AddTriangleMesh(TriangleCullMode::FrontFaceCulling, matLambert_White);
 		m_pMeshes[1]->AppendTriangle(baseTriangle, true);
-		m_pMeshes[1]->Translate({ 0.f, 4.5f, 0.f });
-		m_pMeshes[1]->UpdateAABB();
+		m_pMeshes[1]->CalculateCentroids();
+		m_pMeshes[1]->Translate({ 0.0f, 4.5f, 0.0f });
+
 		m_pMeshes[1]->UpdateTransforms();
+		m_pMeshes[1]->InitBVH();
 
 		m_pMeshes[2] = AddTriangleMesh(TriangleCullMode::NoCulling, matLambert_White);
 		m_pMeshes[2]->AppendTriangle(baseTriangle, true);
-		m_pMeshes[2]->Translate({ 1.75f, 4.5f, 0.f });
-		m_pMeshes[2]->UpdateAABB();
+		m_pMeshes[2]->CalculateCentroids();
+		m_pMeshes[2]->Translate({ 1.75f, 4.5f, 0.0f });
+
 		m_pMeshes[2]->UpdateTransforms();
+		m_pMeshes[2]->InitBVH();
 
 		//Lights
 		AddPointLight(Vector3{ 0.f, 5.f, 5.f }, 50.f, ColorRGB{ 1.f, .61f, .45f }); //Back Light
@@ -389,13 +396,14 @@ namespace dae {
 		AddPlane(Vector3{ -5.f, 0.f, 0.f }, Vector3{ 1.f, 0.f, 0.f }, matLambert_GrayBlue); //left
 
 		//Bunny Mesh
-		m_pMesh = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
-
+		m_pMesh = AddTriangleMesh(dae::TriangleCullMode::BackFaceCulling, matLambert_White);
 		Utils::ParseOBJ("Resources/lowpoly_bunny2.obj", m_pMesh->positions, m_pMesh->normals, m_pMesh->indices);
 
-		m_pMesh->Scale({ 2.f, 2.f, 2.f });
-		m_pMesh->UpdateAABB();
+		m_pMesh->CalculateCentroids();
+		m_pMesh->Scale({ 2.f,2.f,2.f });
+
 		m_pMesh->UpdateTransforms();
+		m_pMesh->InitBVH();
 
 		//Lights
 		AddPointLight(Vector3{ 0.f, 5.f, 5.f }, 50.f, ColorRGB{ 1.f, .61f, .45f }); //Back Light
