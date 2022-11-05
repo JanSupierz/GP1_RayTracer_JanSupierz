@@ -32,9 +32,9 @@ Renderer::Renderer(SDL_Window * pWindow) :
 
 void Renderer::Render(Scene* pScene) const
 {
-	const Camera& camera = pScene->GetCamera();
-	const auto& materials = pScene->GetMaterials();
-	const auto& lights = pScene->GetLights();
+	Camera& camera = pScene->GetCamera();
+	auto& materials = pScene->GetMaterials();
+	auto& lights = pScene->GetLights();
 
 	const float fieldOfView{ tanf(camera.fovAngle*TO_RADIANS / 2.f) };
 
@@ -87,7 +87,7 @@ void Renderer::Render(Scene* pScene) const
 	//Synchronous logic
 	for (uint32_t i{ 0 }; i < m_NumberOfPixels; ++i)
 	{
-		RenderPixel(pScene, i, fieldOfView, camera, lights, materials, viewRay);
+		RenderPixel(pScene, i, fieldOfView, camera, lights, materials);
 	}
 #endif
 
@@ -100,12 +100,11 @@ void dae::Renderer::RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldO
 {
 	const uint32_t px{ pixelIndex % m_Width }, py{ pixelIndex / m_Width };
 
+	Ray viewRay{ camera.origin ,Vector3::Zero };
 	ColorRGB finalColor{ dae::colors::Black };
 
 	const float cx{ (((2.f * (px + 0.5f)) / static_cast<float>(m_Width)) - 1) * m_AspectRatio * fieldOfView };
 	const float cy{ (1 - ((2.f * (py + 0.5f)) / static_cast<float>(m_Height))) * fieldOfView };
-
-	Ray viewRay{ camera.origin ,Vector3::Zero };
 
 	viewRay.direction = (cx * Vector3::UnitX) + (cy * Vector3::UnitY) + Vector3::UnitZ;
 	viewRay.direction.Normalize();
@@ -166,7 +165,6 @@ void dae::Renderer::CycleLightingMode()
 void Renderer::CalculateFinalColor(const Light& light, const Vector3& lightRayDirection, const HitRecord& closestHit, const std::vector<Material*>& materials, const Vector3& viewRayDirection, ColorRGB& finalColor) const
 {
 	float observedArea{ Vector3::Dot(closestHit.normal,lightRayDirection) };
-
 
 		switch (m_CurrentLightingMode)
 		{

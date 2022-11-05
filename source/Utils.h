@@ -9,58 +9,59 @@ namespace dae
 	namespace GeometryUtils
 	{
 #pragma region Sphere HitTest
+
 		//SPHERE HIT-TESTS
 		inline bool HitTest_Sphere(const Sphere& sphere, const Ray& ray, HitRecord& hitRecord, bool ignoreHitRecord = false)
 		{
-			const Vector3 originVector{ ray.origin - sphere.origin };
+				const Vector3 originVector{ ray.origin - sphere.origin };
 
-			const float a{ Vector3::Dot(ray.direction, ray.direction) };
-			const float b{ 2.f * Vector3::Dot(ray.direction, originVector) };
-			const float c{ (Vector3::Dot(originVector,originVector)) - (sphere.radius * sphere.radius) };
+				const float a{ Vector3::Dot(ray.direction, ray.direction) };
+				const float b{ 2.f * Vector3::Dot(ray.direction, originVector) };
+				const float c{ (Vector3::Dot(originVector,originVector)) - (sphere.radius * sphere.radius) };
 
-			const float discriminant{ b * b - 4 * a * c };
+				const float discriminant{ b * b - 4 * a * c };
 
-			if (discriminant < 0.f)
-			{
-				return false;
-			}
-
-			const float sqrtDiscriminant{ sqrt(discriminant) };
-			const float factor{1 / (2.f * a) };
-
-			float calculatedT{ (-b - sqrtDiscriminant) * factor };
-			float secondT{ (-b + sqrtDiscriminant) * factor };
-			
-			if (secondT < calculatedT ) std::swap(calculatedT, secondT);
-
-			if (calculatedT < 0)
-			{
-				calculatedT = secondT;
-				if (calculatedT < 0)
+				if (discriminant < 0.f)
 				{
 					return false;
 				}
-			}
 
-			if (calculatedT < ray.min || calculatedT > ray.max)
-			{
+				const float sqrtDiscriminant{ sqrt(discriminant) };
+				const float factor{ 1 / (2.f * a) };
+
+				float calculatedT{ (-b - sqrtDiscriminant) * factor };
+				float secondT{ (-b + sqrtDiscriminant) * factor };
+
+				if (secondT < calculatedT) std::swap(calculatedT, secondT);
+
+				if (calculatedT < 0)
+				{
+					calculatedT = secondT;
+					if (calculatedT < 0)
+					{
+						return false;
+					}
+				}
+
+				if (calculatedT >= ray.min && calculatedT <= ray.max)
+				{
+					if (ignoreHitRecord) return true;
+
+					if (calculatedT < hitRecord.t)
+					{
+						hitRecord.t = calculatedT;
+
+						hitRecord.materialIndex = sphere.materialIndex;
+						hitRecord.didHit = true;
+						hitRecord.origin = ray.origin + ray.direction * hitRecord.t;
+						hitRecord.normal = hitRecord.origin - sphere.origin;
+						hitRecord.normal.Normalize();
+					}
+
+					return true;
+				}
+
 				return false;
-			}
-
-			if (ignoreHitRecord) return true;
-
-			if (calculatedT < hitRecord.t)
-			{
-				hitRecord.t = calculatedT;
-
-				hitRecord.materialIndex = sphere.materialIndex;
-				hitRecord.didHit = true;
-				hitRecord.origin = ray.origin + ray.direction * hitRecord.t;
-				hitRecord.normal = hitRecord.origin - sphere.origin;
-				hitRecord.normal.Normalize();
-			}
-
-			return true;
 		}
 
 		inline bool HitTest_Sphere(const Sphere& sphere, const Ray& ray)
@@ -75,24 +76,24 @@ namespace dae
 		{
 			const float calculatedT{ Vector3::Dot(plane.origin - ray.origin, plane.normal) / Vector3::Dot(ray.direction,plane.normal) };
 
-			if (calculatedT < ray.min || calculatedT > ray.max)
+			if (calculatedT >= ray.min && calculatedT <= ray.max)
 			{
-				return false;
+				if (ignoreHitRecord) return true;
+
+				if (calculatedT < hitRecord.t)
+				{
+					hitRecord.t = calculatedT;
+
+					hitRecord.materialIndex = plane.materialIndex;
+					hitRecord.didHit = true;
+					hitRecord.origin = ray.origin + ray.direction * hitRecord.t;
+					hitRecord.normal = plane.normal;
+				}
+
+				return true;
 			}
-			
-			if (ignoreHitRecord) return true;
 
-			if (calculatedT < hitRecord.t)
-			{
-				hitRecord.t = calculatedT;
-
-				hitRecord.materialIndex = plane.materialIndex;
-				hitRecord.didHit = true;
-				hitRecord.origin = ray.origin + ray.direction * hitRecord.t;
-				hitRecord.normal = plane.normal;	
-			}
-
-			return true;
+			return false;
 		}
 
 		inline bool HitTest_Plane(const Plane& plane, const Ray& ray)
@@ -108,23 +109,42 @@ namespace dae
 			const Vector3 edge1{ triangle.v1 - triangle.v0 };
 			const Vector3 edge2{ triangle.v2 - triangle.v0 };
 
-			const Vector3 rayDirectionAndEdge2Cross{ Vector3::Cross(ray.direction, edge2) };
+			const Vector3 rayDirectionAndEdge2Cross = Vector3::Cross(ray.direction, edge2);
 
 			const float dot{ Vector3::Dot(edge1, rayDirectionAndEdge2Cross) };
 
 			switch (triangle.cullMode)
 			{
 			case TriangleCullMode::BackFaceCulling:
-				if (ignoreHitRecord && dot > 0) return false;
-				if(dot < 0) return false;
+				if (ignoreHitRecord) 
+				{
+					if (dot > 0)
+					{
+						return false;
+					}
+				}
+				else if(dot < 0)
+				{
+					return false;
+				}
 				break;
 			case TriangleCullMode::FrontFaceCulling:
-				if (ignoreHitRecord && dot < 0 ) return false;
-				if (dot > 0) return false;
+				if (ignoreHitRecord)
+				{
+					if (dot < 0)
+					{
+						return false;
+					}
+				}
+				else if (dot > 0)
+				{
+					return false;
+				}
 				break;
 			case TriangleCullMode::NoCulling:
 				if (dot == 0) return false;
 				break;
+
 			}
 
 			const float inverseDot{ 1.f / dot };
@@ -132,7 +152,7 @@ namespace dae
 
 			const float firstCalculation{ inverseDot * Vector3::Dot(originVector, rayDirectionAndEdge2Cross) };
 
-			if (firstCalculation >= 0.f && firstCalculation <= 1.f)
+			if (firstCalculation < 0.f || firstCalculation > 1.f)
 			{
 				return false;
 			}
@@ -140,14 +160,14 @@ namespace dae
 			const Vector3 rayOriginAndEdge1Cross{ Vector3::Cross(originVector, edge1) };
 			const float secondCalculation{ inverseDot * Vector3::Dot(ray.direction, rayOriginAndEdge1Cross) };
 
-			if (secondCalculation >= 0.f && firstCalculation + secondCalculation <= 1.f)
+			if (secondCalculation < 0.f || firstCalculation + secondCalculation > 1.f)
 			{
 				return false;
 			}
 
 			const float calculatedT{ inverseDot * Vector3::Dot(edge2, rayOriginAndEdge1Cross) };
 
-			if (calculatedT >= ray.min && calculatedT <= ray.max)
+			if (calculatedT < ray.min || calculatedT > ray.max)
 			{
 				return false;
 			}
@@ -179,18 +199,18 @@ namespace dae
 			const float tx1{ (mesh.transformedMinAABB.x - ray.origin.x) / ray.direction.x };
 			const float tx2{ (mesh.transformedMaxAABB.x - ray.origin.x) / ray.direction.x };
 
-			float tmin{ std::min(tx1,tx2) };
-			float tmax{ std::max(tx1,tx2) };
-
 			const float ty1{ (mesh.transformedMinAABB.y - ray.origin.y) / ray.direction.y };
 			const float ty2{ (mesh.transformedMaxAABB.y - ray.origin.y) / ray.direction.y };
 
-			tmin = std::max(tmin,std::min(ty1,ty2));
-			tmax = std::min(tmax,std::max(ty1,ty2));
-
 			const float tz1{ (mesh.transformedMinAABB.z - ray.origin.z) / ray.direction.z };
 			const float tz2{ (mesh.transformedMaxAABB.z - ray.origin.z) / ray.direction.z };
-																				  
+
+			float tmin{ std::min(tx1,tx2) };
+			float tmax{ std::max(tx1,tx2) };
+
+			tmin = std::max(tmin, std::min(ty1, ty2));
+			tmax = std::min(tmax, std::max(ty1, ty2));
+
 			tmin = std::max(tmin, std::min(tz1, tz2));
 			tmax = std::min(tmax, std::max(tz1, tz2));
 

@@ -34,7 +34,7 @@ namespace dae
 	class Material_SolidColor final : public Material
 	{
 	public:
-		explicit Material_SolidColor(const ColorRGB& color): m_Color(color)
+		Material_SolidColor(const ColorRGB& color): m_Color(color)
 		{
 		}
 
@@ -74,7 +74,7 @@ namespace dae
 	class Material_LambertPhong final : public Material
 	{
 	public:
-		Material_LambertPhong(const ColorRGB& diffuseColor, float kd, float ks, float phongExponent):
+		Material_LambertPhong(const ColorRGB& diffuseColor, const float kd, const float ks, const float phongExponent):
 			m_DiffuseColor(diffuseColor), m_DiffuseReflectance(kd), m_SpecularReflectance(ks),
 			m_PhongExponent(phongExponent)
 		{
@@ -98,7 +98,7 @@ namespace dae
 	class Material_CookTorrence final : public Material
 	{
 	public:
-		Material_CookTorrence(const ColorRGB& albedo, const float metalness, const float roughness):
+		Material_CookTorrence(const ColorRGB& albedo,const float metalness,const float roughness):
 			m_Albedo(albedo), m_Metalness(metalness), m_Roughness(roughness)
 		{
 		}
@@ -106,13 +106,9 @@ namespace dae
 		ColorRGB Shade(const HitRecord& hitRecord = {}, const Vector3& l = {}, const Vector3& v = {}) override
 		{
 			const Vector3 halfVector{ (-v + l) / ((-v + l).Magnitude()) };
-			const ColorRGB fresnel{ BRDF::FresnelFunction_Schlick(halfVector,-v,((m_Metalness == 0) ? (ColorRGB{0.04f,0.04f,0.04f}) : m_Albedo)) };
+			const ColorRGB fresnel{ BRDF::FresnelFunction_Schlick(halfVector,-v, (m_Metalness == 0) ? (ColorRGB{1.f,1.f,1.f}*0.04f) : m_Albedo) };
 
-			return 
-			{ 
-				BRDF::Lambert((m_Metalness == 0 ? ColorRGB{ 1.f,1.f,1.f } - fresnel : ColorRGB{0.f,0.f,0.f}),m_Albedo) + 
-				(fresnel * BRDF::NormalDistribution_GGX(hitRecord.normal, halfVector, m_Roughness) * BRDF::GeometryFunction_Smith(hitRecord.normal,-v,l,m_Roughness)) * (1 / (4 * Vector3::Dot(-v, hitRecord.normal) * Vector3::Dot(l, hitRecord.normal)))
-			};
+			return { BRDF::Lambert((m_Metalness == 0 ? ColorRGB{ 1.f,1.f,1.f } - fresnel : ColorRGB{0.f,0.f,0.f}),m_Albedo) + (fresnel * BRDF::NormalDistribution_GGX(hitRecord.normal, halfVector, m_Roughness) * BRDF::GeometryFunction_Smith(hitRecord.normal,-v,l,m_Roughness) * (1 / (4 * Vector3::Dot(-v, hitRecord.normal) * Vector3::Dot(l, hitRecord.normal)))) };
 		}
 
 	private:

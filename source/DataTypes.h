@@ -7,11 +7,24 @@
 namespace dae
 {
 #pragma region GEOMETRY
+
+	struct BoundingBox
+	{
+		Vector3 minAABB;
+		Vector3 maxAABB;
+	};
+
+	struct BVHNode
+	{
+		BoundingBox boundingBox;
+
+		std::vector<int> objectIndices;
+	};
+
 	struct Sphere
 	{
 		Vector3 origin{};
 		float radius{};
-
 		unsigned char materialIndex{ 0 };
 	};
 
@@ -80,18 +93,19 @@ namespace dae
 
 		TriangleCullMode cullMode{TriangleCullMode::BackFaceCulling};
 
-		Matrix rotationTransform{};
-		Matrix translationTransform{};
-		Matrix scaleTransform{};
-
 		Vector3 minAABB;
 		Vector3 maxAABB;
 
 		Vector3 transformedMinAABB;
 		Vector3 transformedMaxAABB;
 
+		Matrix rotationTransform{};
+		Matrix translationTransform{};
+		Matrix scaleTransform{};
+
 		std::vector<Vector3> transformedPositions{};
 		std::vector<Vector3> transformedNormals{};
+
 
 		void Translate(const Vector3& translation)
 		{
@@ -110,17 +124,15 @@ namespace dae
 
 		void AppendTriangle(const Triangle& triangle, bool ignoreTransformUpdate = false)
 		{
-			auto startIndex = static_cast<int>(positions.size());
+			int startIndex = static_cast<int>(positions.size());
 
 			positions.push_back(triangle.v0);
 			positions.push_back(triangle.v1);
 			positions.push_back(triangle.v2);
 
 			indices.push_back(startIndex);
-			++startIndex;
-			indices.push_back(startIndex);
-			++startIndex;
-			indices.push_back(startIndex);
+			indices.push_back(++startIndex);
+			indices.push_back(++startIndex);
 
 			normals.push_back(triangle.normal);
 
