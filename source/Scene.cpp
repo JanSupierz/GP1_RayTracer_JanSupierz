@@ -28,43 +28,56 @@ namespace dae {
 
 	void dae::Scene::GetClosestHit(const Ray& ray, HitRecord& closestHit) const
 	{
-		for (const Sphere& sphere : m_SphereGeometries)
+		if (GeometryUtils::SlabTest_BoundingBox(m_SpheresBoundingBox.min, m_SpheresBoundingBox.max, ray))
 		{
-			dae::GeometryUtils::HitTest_Sphere(sphere, ray, closestHit);
+			for (const Sphere& sphere : m_SphereGeometries)
+			{
+				dae::GeometryUtils::HitTest_Sphere(sphere, ray, closestHit);
+			}
+		}
+		
+		if (GeometryUtils::SlabTest_BoundingBox(m_TrianglesBoundingBox.min, m_TrianglesBoundingBox.max, ray))
+		{
+			for (const TriangleMesh& triangleMesh : m_TriangleMeshGeometries)
+			{
+				dae::GeometryUtils::HitTest_TriangleMesh(triangleMesh, ray, closestHit);
+			}
 		}
 
 		for (const Plane& plane : m_PlaneGeometries)
 		{
 			dae::GeometryUtils::HitTest_Plane(plane, ray, closestHit);
 		}
-
-		for (const TriangleMesh& triangleMesh : m_TriangleMeshGeometries)
-		{
-			dae::GeometryUtils::HitTest_TriangleMesh(triangleMesh, ray, closestHit);
-		}
 	}
 
 	bool Scene::DoesHit(const Ray& ray) const
 	{
-		for (const Sphere& sphere : m_SphereGeometries)
+		if (GeometryUtils::SlabTest_BoundingBox(m_SpheresBoundingBox.min, m_SpheresBoundingBox.max, ray))
 		{
-			if (dae::GeometryUtils::HitTest_Sphere(sphere, ray)) return true;
+			for (const Sphere& sphere : m_SphereGeometries)
+			{
+				if (dae::GeometryUtils::HitTest_Sphere(sphere, ray)) return true;
+			}
 		}
 
+		if (GeometryUtils::SlabTest_BoundingBox(m_TrianglesBoundingBox.min, m_TrianglesBoundingBox.max, ray))
+		{
+			for (const TriangleMesh& triangleMesh : m_TriangleMeshGeometries)
+			{
+				if (dae::GeometryUtils::HitTest_TriangleMesh(triangleMesh, ray)) return true;
+			}
+		}
+		
 		for (const Plane& plane : m_PlaneGeometries)
 		{
 			if (dae::GeometryUtils::HitTest_Plane(plane, ray)) return true;
 		}
 
-		for (const TriangleMesh& triangleMesh : m_TriangleMeshGeometries)
-		{
-			if (dae::GeometryUtils::HitTest_TriangleMesh(triangleMesh, ray)) return true;
-		}
-	
 		return false;
 	}
 
 #pragma region Scene Helpers
+
 	Sphere* Scene::AddSphere(const Vector3& origin, float radius, unsigned char materialIndex)
 	{
 		Sphere s;
@@ -326,19 +339,18 @@ namespace dae {
 		AddPlane(Vector3{ -5.f, 0.f, 0.f }, Vector3{ 1.f, 0.f, 0.f }, matLambert_GrayBlue); //left
 
 		//Spheres
-		AddSphere(Vector3{ -1.75, 1.f, 0.f }, .75f, matCT_GrayRoughMetal);
-		AddSphere(Vector3{ 0.f, 1.f, 0.f }, .75f, matCT_GrayMediumMetal);
-		AddSphere(Vector3{ 1.75, 1.f, 0.f }, .75f, matCT_GraySmoothMetal);
-		AddSphere(Vector3{ -1.75, 3.f, 0.f }, .75f, matCT_GrayRoughPlastic);
-		AddSphere(Vector3{ 0.f, 3.f, 0.f }, .75f, matCT_GrayMediumPlastic);
-		AddSphere(Vector3{ 1.75, 3.f, 0.f }, .75f, matCT_GraySmoothPlastic);
+		m_SpheresBoundingBox.grow(AddSphere(Vector3{ -1.75, 1.f, 0.f }, .75f, matCT_GrayRoughMetal));
+		m_SpheresBoundingBox.grow(AddSphere(Vector3{ 0.f, 1.f, 0.f }, .75f, matCT_GrayMediumMetal));
+		m_SpheresBoundingBox.grow(AddSphere(Vector3{ 1.75, 1.f, 0.f }, .75f, matCT_GraySmoothMetal));
+		m_SpheresBoundingBox.grow(AddSphere(Vector3{ -1.75, 3.f, 0.f }, .75f, matCT_GrayRoughPlastic));
+		m_SpheresBoundingBox.grow(AddSphere(Vector3{ 0.f, 3.f, 0.f }, .75f, matCT_GrayMediumPlastic));
+		m_SpheresBoundingBox.grow(AddSphere(Vector3{ 1.75, 3.f, 0.f }, .75f, matCT_GraySmoothPlastic));
 
 		//TriangleMesh
 		const Triangle baseTriangle = { Vector3(-0.75f, 1.5f, 0.0f), Vector3(0.75f, 0.0f, 0.0f), Vector3(-0.75f, 0.0f, 0.0f) };
 
 		m_pMeshes[0] = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
 		m_pMeshes[0]->AppendTriangle(baseTriangle, true);
-
 		m_pMeshes[0]->CalculateCentroids();
 		m_pMeshes[0]->Translate({ -1.75f, 4.5f, 0.0f });
 
@@ -371,11 +383,14 @@ namespace dae {
 	{
 		Scene::Update(pTimer);
 
-		const auto yawAngle = (cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2;
+		const float yawAngle = (cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2;
 		for (const auto m : m_pMeshes)
 		{
 			m->RotateY(yawAngle);
 			m->UpdateTransforms();
+			BVHNode& node = m->bvhNodes[m->rootNodeIdx];
+			m_TrianglesBoundingBox.grow(node.minAABB);
+			m_TrianglesBoundingBox.grow(node.maxAABB);
 		}
 	}
 
@@ -409,6 +424,19 @@ namespace dae {
 		AddPointLight(Vector3{ 0.f, 5.f, 5.f }, 50.f, ColorRGB{ 1.f, .61f, .45f }); //Back Light
 		AddPointLight(Vector3{ -2.5f, 5.f, -5.f }, 70.f, ColorRGB{ 1.f, .8f, .45f }); //Front Left Light
 		AddPointLight(Vector3{ 2.5f, 2.5f, -5.f }, 50.f, ColorRGB{ .34f, .47f, .68f });
+	}
+
+	void Scene_W4_BunnyScene::Update(Timer* pTimer)
+	{
+		Scene::Update(pTimer);
+
+		m_pMesh->RotateY((cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2);
+		m_pMesh->UpdateTransforms();
+
+		BVHNode& node = m_pMesh->bvhNodes[m_pMesh->rootNodeIdx];
+		m_TrianglesBoundingBox.grow(node.minAABB);
+		m_TrianglesBoundingBox.grow(node.maxAABB);
+
 	}
 #pragma endregion
 }

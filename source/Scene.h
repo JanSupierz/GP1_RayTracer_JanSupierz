@@ -51,10 +51,15 @@ namespace dae
 		std::vector<Light> m_Lights{};
 		std::vector<Material*> m_Materials{};
 
+		aabb m_TrianglesBoundingBox{};
+		aabb m_SpheresBoundingBox{};
+
 		////Temp (individual Triangle Testing)
 		//std::vector<Triangle> m_Triangles{};
 
 		Camera m_Camera{};
+
+		//BVHNode* CreateTriangleBVHNode();
 
 		Sphere* AddSphere(const Vector3& origin, float radius, unsigned char materialIndex = 0);
 		Plane* AddPlane(const Vector3& origin, const Vector3& normal, unsigned char materialIndex = 0);
@@ -158,7 +163,7 @@ namespace dae
 		void Update(Timer* pTimer) override;
 
 	private:
-		TriangleMesh* m_pMeshes[3]{};
+		TriangleMesh* m_pMeshes[3]{nullptr};
 	};
 
 	class Scene_W4_BunnyScene final : public Scene
@@ -173,6 +178,7 @@ namespace dae
 		Scene_W4_BunnyScene& operator=(Scene_W4_BunnyScene&&) noexcept = delete;
 
 		void Initialize() override;
+		void Update(Timer* pTimer) override;
 
 	private:
 		TriangleMesh* m_pMesh{ nullptr };

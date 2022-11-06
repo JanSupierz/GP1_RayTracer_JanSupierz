@@ -36,7 +36,7 @@ void Renderer::Render(Scene* pScene) const
 	auto& materials = pScene->GetMaterials();
 	auto& lights = pScene->GetLights();
 
-	const float fieldOfView{ tanf(camera.fovAngle*TO_RADIANS / 2.f) };
+	const float fieldOfView{ tanf(camera.fovAngle*TO_RADIANS * 0.5f) };
 
 #if defined(ASYNC)
 	//Async logic
@@ -109,6 +109,7 @@ void dae::Renderer::RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldO
 	viewRay.direction = (cx * Vector3::UnitX) + (cy * Vector3::UnitY) + Vector3::UnitZ;
 	viewRay.direction.Normalize();
 	viewRay.direction = camera.cameraToWorld.TransformVector(viewRay.direction);
+	viewRay.inverseDirection = { 1.f / viewRay.direction.x,1.f / viewRay.direction.y,1.f / viewRay.direction.z };
 
 	HitRecord closestHit{};
 	pScene->GetClosestHit(viewRay, closestHit);
@@ -121,6 +122,7 @@ void dae::Renderer::RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldO
 		{
 			lightRay.direction = LightUtils::GetDirectionToLight(light, lightRay.origin);
 			lightRay.max = lightRay.direction.Normalize();
+			lightRay.inverseDirection = { 1.f / lightRay.direction.x,1.f / lightRay.direction.y,1.f / lightRay.direction.z };
 
 			if (m_ShadowsEnabled) //als de schaduwen aan staan
 			{

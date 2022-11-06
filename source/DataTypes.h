@@ -69,68 +69,55 @@ namespace dae
 
 		struct aabb
 		{
-			Vector3 bMin = Vector3{ INFINITY,INFINITY,INFINITY }, bMax = -Vector3{ INFINITY,INFINITY,INFINITY };
+			Vector3 min = Vector3{ INFINITY,INFINITY,INFINITY }, max = -Vector3{ INFINITY,INFINITY,INFINITY };
 
-			void grow(Vector3 p) 
+			void grow(Vector3 pos) 
 			{ 
-				bMin.x = std::min(bMin.x, p.x);
-				bMin.y = std::min(bMin.y, p.y);
-				bMin.z = std::min(bMin.z, p.z);
+				min = Vector3::Min(min, pos);
+				max = Vector3::Max(max, pos);
+			}
 
-				bMax.x = std::min(bMax.x, p.x);
-				bMax.y = std::min(bMax.y, p.y);
-				bMax.z = std::min(bMax.z, p.z);
+			void grow(Sphere* sphere)
+			{
+				const Vector3 origin = sphere->origin;
+				const Vector3 radius = sphere->radius * Vector3{ 1.f,1.f,1.f };
+
+				min = Vector3::Min(origin - radius, min);
+				max = Vector3::Max(origin + radius, max);
 			}
 
 			float area()
 			{
-				Vector3 extent = bMax - bMin; // box extent
+				Vector3 extent = max - min; // box extent
 				return extent.x * extent.y + extent.y * extent.z + extent.z * extent.x;
 			}
 		};
 
+
 		struct TriangleMesh
 		{
 			TriangleMesh() = default;
-			TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<int>& _indices, TriangleCullMode _cullMode) :
-				positions(_positions), indices(_indices), cullMode(_cullMode)
-			{
-				trCount = static_cast<int>(_indices.size()) / 3;
-				CalculateNormals();
-				CalculateCentroids();
-				InitBVH();
-
-				//Update Transforms
-				//UpdateTransforms();
-			}
 
 			TriangleMesh(const std::vector<Vector3>& _positions, const std::vector<int>& _indices, const std::vector<Vector3>& _normals, TriangleCullMode _cullMode) :
 				positions(_positions), indices(_indices), normals(_normals), cullMode(_cullMode)
 			{
-				trCount = static_cast<int>(_indices.size()) / 3;
-				CalculateCentroids();
-				InitBVH();
-				//UpdateTransforms();
+				nrTriangles = static_cast<int>(_indices.size()) / 3;
 			}
 
 			std::vector<Vector3> positions{};
 			std::vector<Vector3> normals{};
 			std::vector<Vector3> centroids{};
 			std::vector<int> indices{};
+
 			unsigned char materialIndex{};
-			uint32_t trCount{};
+
+			uint32_t nrTriangles{};
 
 			TriangleCullMode cullMode{ TriangleCullMode::BackFaceCulling };
 
 			Matrix rotationTransform{};
 			Matrix translationTransform{};
 			Matrix scaleTransform{};
-
-			Vector3 minAABB;
-			Vector3 maxAABB;
-
-			Vector3 transformedMinAABB;
-			Vector3 transformedMaxAABB;
 
 			std::vector<Vector3> transformedPositions{};
 			std::vector<Vector3> transformedNormals{};
@@ -168,6 +155,7 @@ namespace dae
 				indices.push_back(++startIndex);
 
 				normals.push_back(triangle.normal);
+				centroids.push_back(triangle.centroid);
 
 				//Not ideal, but making sure all vertices are updated
 				if (!ignoreTransformUpdate)
@@ -176,7 +164,7 @@ namespace dae
 
 			void CalculateNormals()
 			{
-				if (trCount % 3 != 0)
+				if (nrTriangles % 3 != 0)
 				{
 					return;
 				}
@@ -185,7 +173,7 @@ namespace dae
 				Vector3 v1{};
 				Vector3 v2{};
 
-				for (size_t currentTriangle = 0; currentTriangle < trCount; ++currentTriangle)
+				for (size_t currentTriangle = 0; currentTriangle < nrTriangles; ++currentTriangle)
 				{
 					v0 = positions[indices[currentTriangle * 3]];
 					v1 = positions[indices[currentTriangle * 3 + 1]];
@@ -198,19 +186,21 @@ namespace dae
 
 			void CalculateCentroids()
 			{
-				trCount = static_cast<int>(indices.size()) / 3;
+				const float division{ 1.f / 3.f };
+
+				nrTriangles = static_cast<int>(indices.size() * division);
 				centroids.reserve(normals.size());
 				Vector3 v0{};
 				Vector3 v1{};
 				Vector3 v2{};
 
-				for (size_t currentTriangle = 0; currentTriangle < trCount; ++currentTriangle)
+				for (size_t currentTriangle = 0; currentTriangle < nrTriangles; ++currentTriangle)
 				{
 					v0 = positions[indices[currentTriangle * 3]];
 					v1 = positions[indices[currentTriangle * 3 + 1]];
 					v2 = positions[indices[currentTriangle * 3 + 2]];
 
-					centroids.push_back((v0 + v1 + v2) / 3.f);
+					centroids.push_back((v0 + v1 + v2) * division);
 				}
 			}
 
@@ -223,12 +213,11 @@ namespace dae
 				transformedCentroids.reserve(centroids.size());
 				transformedPositions.reserve(positions.size());
 
-				auto transformMatrix = translationTransform * rotationTransform * scaleTransform;
+				auto transformMatrix = rotationTransform * translationTransform * scaleTransform;
 
 				for (size_t i = 0; i < positions.size(); i++)
 				{
 					transformedPositions.emplace_back(transformMatrix.TransformPoint(positions[i]));
-
 				}
 
 				for (size_t i = 0; i < centroids.size(); i++)
@@ -241,8 +230,26 @@ namespace dae
 					transformedNormals.emplace_back((transformMatrix.TransformVector(normals[i])).Normalized());
 				}
 
+				RefitBVH();
+			}
 
-				//UpdateTransformedAABB(transformMatrix);
+			void RefitBVH()
+			{
+				for (int i = nodesUsed - 1; i >= 0; i--)
+				{
+					BVHNode& node = bvhNodes[i];
+
+					if (node.nrPrimitives != 0)
+					{
+						UpdateAABB(i);
+						continue;
+					}
+
+					BVHNode& leftChild = bvhNodes[node.leftFirst];
+					BVHNode& rightChild = bvhNodes[node.leftFirst + 1];
+					node.minAABB = Vector3::Min(leftChild.minAABB, rightChild.minAABB);
+					node.maxAABB = Vector3::Max(leftChild.maxAABB, rightChild.maxAABB);
+				}
 			}
 
 			void UpdateAABB(uint32_t nodeIdx)
@@ -259,60 +266,12 @@ namespace dae
 				{
 					node.minAABB = Vector3::Min(transformedPositions[indices[i]], node.minAABB);
 					node.maxAABB = Vector3::Max(transformedPositions[indices[i]], node.maxAABB);
-
 				}
-			}
-
-			void UpdateTransformedAABB(const Matrix& finalTransform)
-			{
-				//Transform the 8 vertices of the aabb
-				//then calculate new min and max
-				Vector3 tMinAABB = finalTransform.TransformPoint(minAABB);
-				Vector3 tMaxAABB = tMinAABB;
-
-				// (xmax,ymin,zmin)
-				Vector3 tAABB = finalTransform.TransformPoint(maxAABB.x, minAABB.y, minAABB.z);
-				tMinAABB = Vector3::Min(tAABB, tMinAABB);
-				tMaxAABB = Vector3::Max(tAABB, tMaxAABB);
-
-				// (xmax,ymin,zmax)
-				tAABB = finalTransform.TransformPoint(maxAABB.x, minAABB.y, maxAABB.z);
-				tMinAABB = Vector3::Min(tAABB, tMinAABB);
-				tMaxAABB = Vector3::Max(tAABB, tMaxAABB);
-
-				// (xmin,ymin,zmax)
-				tAABB = finalTransform.TransformPoint(minAABB.x, minAABB.y, maxAABB.z);
-				tMinAABB = Vector3::Min(tAABB, tMinAABB);
-				tMaxAABB = Vector3::Max(tAABB, tMaxAABB);
-
-				// (xmin,ymax,zmin)
-				tAABB = finalTransform.TransformPoint(minAABB.x, maxAABB.y, minAABB.z);
-				tMinAABB = Vector3::Min(tAABB, tMinAABB);
-				tMaxAABB = Vector3::Max(tAABB, tMaxAABB);
-
-				// (xmax,ymax,zmin)
-				tAABB = finalTransform.TransformPoint(maxAABB.x, maxAABB.y, minAABB.z);
-				tMinAABB = Vector3::Min(tAABB, tMinAABB);
-				tMaxAABB = Vector3::Max(tAABB, tMaxAABB);
-
-				// (xmax,ymax,zmax)
-				tAABB = finalTransform.TransformPoint(maxAABB);
-				tMinAABB = Vector3::Min(tAABB, tMinAABB);
-				tMaxAABB = Vector3::Max(tAABB, tMaxAABB);
-
-				// (xmin,ymax,zmax)
-				tAABB = finalTransform.TransformPoint(minAABB.x, maxAABB.y, minAABB.z);
-				tMinAABB = Vector3::Min(tAABB, tMinAABB);
-				tMaxAABB = Vector3::Max(tAABB, tMaxAABB);
-
-				transformedMinAABB = tMinAABB;
-				transformedMaxAABB = tMaxAABB;
-
 			}
 
 			void InitBVH()
 			{
-				bvhNodes.reserve(trCount * 2 - 1);
+				bvhNodes.reserve(nrTriangles * 2 - 1);
 
 				for (size_t i = 0; i < bvhNodes.capacity(); i++)
 				{
@@ -323,13 +282,13 @@ namespace dae
 				nodesUsed = 1;
 
 				bvhNodes[rootNodeIdx].leftFirst = 0; //Means no left child
-				bvhNodes[rootNodeIdx].nrPrimitives = trCount; //IsLeaf
+				bvhNodes[rootNodeIdx].nrPrimitives = nrTriangles; //IsLeaf
 
 				UpdateAABB(rootNodeIdx);
 				Subdivide(rootNodeIdx);
 			}
 
-			float EvaluateSAH(BVHNode& node, int axis, float pos)
+			float EvaluateSAH(const BVHNode& node, const int axis, const float pos)
 			{
 				// determine triangle counts and bounds for this split candidate
 				aabb leftBox, rightBox;
@@ -340,96 +299,61 @@ namespace dae
 					if (transformedCentroids[index][axis] < pos)
 					{
 						leftCount++;
-						leftBox.grow(transformedPositions[index]);
-						leftBox.grow(transformedPositions[index+1]);
-						leftBox.grow(transformedPositions[index+2]);
+						leftBox.grow(transformedPositions[indices[index * 3]]);
+						leftBox.grow(transformedPositions[indices[index * 3 + 1]]);
+						leftBox.grow(transformedPositions[indices[index * 3 + 2]]);
 					}
 					else
 					{
 						rightCount++;
-						rightBox.grow(transformedPositions[index]);
-						rightBox.grow(transformedPositions[index+1]);
-						rightBox.grow(transformedPositions[index+2]);
+						rightBox.grow(transformedPositions[indices[index * 3]]);
+						rightBox.grow(transformedPositions[indices[index * 3 + 1]]);
+						rightBox.grow(transformedPositions[indices[index * 3 + 2]]);
 					}
 				}
 				float cost = leftCount * leftBox.area() + rightCount * rightBox.area();
 				return cost > 0 ? cost : INFINITY;
 			}
 
-			void Subdivide(uint32_t nodeIdx)
+			void Subdivide(const uint32_t nodeIdx)
 			{
 				BVHNode& node = bvhNodes[nodeIdx];
-				//Terminate recursion
-				if (node.nrPrimitives <= 2)
-					return;
 
 				// determine split axis using SAH
-				//int bestAxis = -1;
-				//float bestPos = 0, bestCost = INFINITY;
+				int bestAxis = -1;
+				float bestPos = 0;
+				float bestCost = INFINITY;
 
-				//for (int axis = 0; axis < 3; axis++) for (size_t i = 0; i < node.nrPrimitives; i++)
-				//{
-				//	size_t index = node.leftFirst + i;
-				//	float candidatePos = transformedCentroids[index][axis];
-				//	float cost = EvaluateSAH(node, axis, candidatePos);
-				//	if (cost < bestCost)
-				//	{
-				//		bestPos = candidatePos, bestAxis = axis, bestCost = cost;
-				//	}
-				//}
-				//int axis = bestAxis;
-				//float splitPos = bestPos;
-
-				//const Vector3 extent = node.maxAABB - node.minAABB; // extent of parent
-				//float parentArea = extent.x * extent.y + extent.y * extent.z + extent.z * extent.x;
-				//float parentCost = node.nrPrimitives * parentArea;
-
-				//if (bestCost >= parentCost) return;
-
-				Vector3 axisSize = node.maxAABB - node.minAABB;
-
-				//We subdevide along the longest axis
-				int axis = 0; //x-axis
-				if (axisSize.y > axisSize.x)
+				for (int axis = 0; axis < 3; axis++)
 				{
-					axis = 1; // y-axis
+					for (size_t i = 0; i < node.nrPrimitives; i++)
+					{
+						float candidatePos = transformedCentroids[node.leftFirst + i][axis];
+
+						float cost = EvaluateSAH(node, axis, candidatePos);
+
+						if (cost < bestCost)
+						{
+							bestPos = candidatePos;
+							bestAxis = axis;
+							bestCost = cost;
+						}
+					}
 				}
-				if (axisSize.z > axisSize[axis])
-				{
-					axis = 2; //z-axis
-				}
-				bool testedAllAxis{ false };
-				float splitPos{ node.minAABB[axis] + axisSize[axis] / 2.0f };
+
+				const Vector3 extent = node.maxAABB - node.minAABB; // extent of parent
+				float parentArea = extent.x * extent.y + extent.y * extent.z + extent.z * extent.x;
+				float parentCost = node.nrPrimitives * parentArea;
+
+				if (bestCost >= parentCost) return;
 
 				//Sort the primitives (Quicksort)
 				int left = node.leftFirst;
 				int right = left + node.nrPrimitives - 1;
 
-				int leftCount{};
-				int sortCount{ 0 };
+				SortPrimitives(left, right, bestAxis, bestPos);
 
-				while (sortCount < 3)
-				{
-					++sortCount;
-
-					left = node.leftFirst;
-					SortPrimitives(left, right, axis, splitPos);
-					leftCount = left - node.leftFirst;
-
-					if (axis == 2)
-					{
-						axis = 0;
-					}
-					else
-					{
-						++axis;
-					}
-
-					if (leftCount != 0 && leftCount != node.nrPrimitives)
-					{
-						break;
-					}
-				}
+				int leftCount = left - node.leftFirst;
 
 				if (leftCount == 0 || leftCount == node.nrPrimitives)
 					return; // Either nothing on the left side, or everything on the left side
@@ -500,6 +424,7 @@ namespace dae
 	{
 		Vector3 origin{};
 		Vector3 direction{};
+		Vector3 inverseDirection{};
 
 		float min{ 0.0001f };
 		float max{ FLT_MAX };
