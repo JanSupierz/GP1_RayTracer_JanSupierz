@@ -145,7 +145,6 @@ namespace dae {
 #pragma region SCENE W1
 	void Scene_W1::Initialize()
 	{
-				//default: Material id0 >> SolidColor Material (RED)
 		constexpr unsigned char matId_Solid_Red = 0;
 		const unsigned char matId_Solid_Blue = AddMaterial(new Material_SolidColor{ colors::Blue });
 		const unsigned char matId_Solid_Yellow = AddMaterial(new Material_SolidColor{ colors::Yellow });
@@ -163,8 +162,6 @@ namespace dae {
 		AddPlane({ 0.f, -75.f, 0.f }, { 0.f, 1.f,0.f }, matId_Solid_Yellow);
 		AddPlane({ 0.f, 75.f, 0.f }, { 0.f, -1.f,0.f }, matId_Solid_Yellow);
 		AddPlane({ 0.f, 0.f, 125.f }, { 0.f, 0.f,-1.f }, matId_Solid_Magenta);
-
-		//AddPlane({ 0.f, 75.f, 0.f }, { 0.f, 0.7071f,0.7071f }, matId_Solid_Yellow);
 	}
 #pragma endregion
 
@@ -174,7 +171,6 @@ namespace dae {
 		m_Camera.origin = { 0.f,3.f,-9.f };
 		m_Camera.fovAngle = 45.f;
 
-		//default: Material id0 >> SolidColor Material (RED)
 		constexpr unsigned char matId_Solid_Red = 0;
 		const unsigned char matId_Solid_Blue = AddMaterial(new Material_SolidColor{ colors::Blue });
 
@@ -298,8 +294,9 @@ namespace dae {
 
 		pMesh->Scale({ 0.7f,0.7f,0.7f });
 		pMesh->Translate({ 0.f,1.f,0.f });
-
 		pMesh->UpdateTransforms();
+
+		pMesh->InitBVH();
 
 		//Light
 		AddPointLight(Vector3{ 0.f,5.f,5.f }, 50.f, ColorRGB{ 1.f,0.61f,0.45f }); //Back light
@@ -351,26 +348,23 @@ namespace dae {
 
 		m_pMeshes[0] = AddTriangleMesh(TriangleCullMode::BackFaceCulling, matLambert_White);
 		m_pMeshes[0]->AppendTriangle(baseTriangle, true);
-		m_pMeshes[0]->CalculateCentroids();
 		m_pMeshes[0]->Translate({ -1.75f, 4.5f, 0.0f });
-
 		m_pMeshes[0]->UpdateTransforms();
+
 		m_pMeshes[0]->InitBVH();
 
 		m_pMeshes[1] = AddTriangleMesh(TriangleCullMode::FrontFaceCulling, matLambert_White);
 		m_pMeshes[1]->AppendTriangle(baseTriangle, true);
-		m_pMeshes[1]->CalculateCentroids();
 		m_pMeshes[1]->Translate({ 0.0f, 4.5f, 0.0f });
-
 		m_pMeshes[1]->UpdateTransforms();
+
 		m_pMeshes[1]->InitBVH();
 
 		m_pMeshes[2] = AddTriangleMesh(TriangleCullMode::NoCulling, matLambert_White);
 		m_pMeshes[2]->AppendTriangle(baseTriangle, true);
-		m_pMeshes[2]->CalculateCentroids();
 		m_pMeshes[2]->Translate({ 1.75f, 4.5f, 0.0f });
-
 		m_pMeshes[2]->UpdateTransforms();
+
 		m_pMeshes[2]->InitBVH();
 
 		//Lights
@@ -383,12 +377,17 @@ namespace dae {
 	{
 		Scene::Update(pTimer);
 
-		const float yawAngle = (cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2;
-		for (const auto m : m_pMeshes)
+		const float yawAngle{ (cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2 };
+
+		m_TrianglesBoundingBox.min = Vector3{ INFINITY,INFINITY,INFINITY };
+		m_TrianglesBoundingBox.max = -m_TrianglesBoundingBox.min;
+
+		for (const auto pMesh : m_pMeshes)
 		{
-			m->RotateY(yawAngle);
-			m->UpdateTransforms();
-			BVHNode& node = m->bvhNodes[m->rootNodeIdx];
+			pMesh->RotateY(yawAngle);
+			pMesh->UpdateTransforms();
+			BVHNode& node = pMesh->bvhNodes[pMesh->rootNodeIndex];
+
 			m_TrianglesBoundingBox.grow(node.minAABB);
 			m_TrianglesBoundingBox.grow(node.maxAABB);
 		}
@@ -414,7 +413,6 @@ namespace dae {
 		m_pMesh = AddTriangleMesh(dae::TriangleCullMode::BackFaceCulling, matLambert_White);
 		Utils::ParseOBJ("Resources/lowpoly_bunny2.obj", m_pMesh->positions, m_pMesh->normals, m_pMesh->indices);
 
-		m_pMesh->CalculateCentroids();
 		m_pMesh->Scale({ 2.f,2.f,2.f });
 
 		m_pMesh->UpdateTransforms();
@@ -433,7 +431,51 @@ namespace dae {
 		m_pMesh->RotateY((cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2);
 		m_pMesh->UpdateTransforms();
 
-		BVHNode& node = m_pMesh->bvhNodes[m_pMesh->rootNodeIdx];
+		BVHNode& node = m_pMesh->bvhNodes[m_pMesh->rootNodeIndex];
+		m_TrianglesBoundingBox.grow(node.minAABB);
+		m_TrianglesBoundingBox.grow(node.maxAABB);
+
+	}
+
+	void Scene_W4_CarScene::Initialize()
+	{
+		m_Camera.origin = { 0, 3, -9 };
+		m_Camera.fovAngle = 45.f;
+
+		//Material
+		const auto matLambert_GrayBlue = AddMaterial(new Material_Lambert({ .49f, .57f, .57f }, 1.f));
+		const auto matLambert_White = AddMaterial(new Material_Lambert(colors::White, 1.f));
+
+		//planes
+		AddPlane(Vector3{ 0.f, 0.f, 10.f }, Vector3{ 0.f, 0.f, -1.f }, matLambert_GrayBlue); //back
+		AddPlane(Vector3{ 0.f, 0.f, 0.f }, Vector3{ 0.f, 1.f, 0.f }, matLambert_GrayBlue); //bottom
+		AddPlane(Vector3{ 0.f, 10.f, 0.f }, Vector3{ 0.f, -1.f, 0.f }, matLambert_GrayBlue); //top
+		AddPlane(Vector3{ 5.f, 0.f, 0.f }, Vector3{ -1.f, 0.f, 0.f }, matLambert_GrayBlue); //right
+		AddPlane(Vector3{ -5.f, 0.f, 0.f }, Vector3{ 1.f, 0.f, 0.f }, matLambert_GrayBlue); //left
+
+		//Bunny Mesh
+		m_pMesh = AddTriangleMesh(dae::TriangleCullMode::BackFaceCulling, matLambert_White);
+		Utils::ParseOBJ("Resources/car.obj", m_pMesh->positions, m_pMesh->normals, m_pMesh->indices);
+
+		//m_pMesh->Scale({ 2.f,2.f,2.f });
+
+		m_pMesh->UpdateTransforms();
+		m_pMesh->InitBVH();
+
+		//Lights
+		AddPointLight(Vector3{ 0.f, 5.f, 5.f }, 50.f, ColorRGB{ 1.f, .61f, .45f }); //Back Light
+		AddPointLight(Vector3{ -2.5f, 5.f, -5.f }, 70.f, ColorRGB{ 1.f, .8f, .45f }); //Front Left Light
+		AddPointLight(Vector3{ 2.5f, 2.5f, -5.f }, 50.f, ColorRGB{ .34f, .47f, .68f });
+	}
+
+	void Scene_W4_CarScene::Update(Timer* pTimer)
+	{
+		Scene::Update(pTimer);
+
+		//m_pMesh->RotateY((cos(pTimer->GetTotal()) + 1.f) / 2.f * PI_2);
+		//m_pMesh->UpdateTransforms();
+
+		BVHNode& node = m_pMesh->bvhNodes[m_pMesh->rootNodeIndex];
 		m_TrianglesBoundingBox.grow(node.minAABB);
 		m_TrianglesBoundingBox.grow(node.maxAABB);
 

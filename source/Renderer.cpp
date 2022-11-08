@@ -126,7 +126,8 @@ void dae::Renderer::RenderPixel(Scene* pScene, uint32_t pixelIndex, float fieldO
 
 			if (m_ShadowsEnabled) //als de schaduwen aan staan
 			{
-				if (!pScene->DoesHit(lightRay)) //en als er niets zit tussen de lichtbron en deze pixel
+				//en als er niets zit tussen de lichtbron en deze pixel
+				if (!pScene->DoesHit(lightRay))
 				{
 					CalculateFinalColor(light, lightRay.direction, closestHit, materials, viewRay.direction, finalColor); //dan berekenen we licht
 				}
@@ -170,7 +171,6 @@ void Renderer::CalculateFinalColor(const Light& light, const Vector3& lightRayDi
 
 		switch (m_CurrentLightingMode)
 		{
-
 		case LightingMode::ObservedArea:
 			if (observedArea > 0.f)
 			{

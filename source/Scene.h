@@ -51,15 +51,10 @@ namespace dae
 		std::vector<Light> m_Lights{};
 		std::vector<Material*> m_Materials{};
 
-		aabb m_TrianglesBoundingBox{};
-		aabb m_SpheresBoundingBox{};
-
-		////Temp (individual Triangle Testing)
-		//std::vector<Triangle> m_Triangles{};
+		Aabb m_TrianglesBoundingBox{};
+		Aabb m_SpheresBoundingBox{};
 
 		Camera m_Camera{};
-
-		//BVHNode* CreateTriangleBVHNode();
 
 		Sphere* AddSphere(const Vector3& origin, float radius, unsigned char materialIndex = 0);
 		Plane* AddPlane(const Vector3& origin, const Vector3& normal, unsigned char materialIndex = 0);
@@ -176,6 +171,24 @@ namespace dae
 		Scene_W4_BunnyScene(Scene_W4_BunnyScene&&) noexcept = delete;
 		Scene_W4_BunnyScene& operator=(const Scene_W4_BunnyScene&) = delete;
 		Scene_W4_BunnyScene& operator=(Scene_W4_BunnyScene&&) noexcept = delete;
+
+		void Initialize() override;
+		void Update(Timer* pTimer) override;
+
+	private:
+		TriangleMesh* m_pMesh{ nullptr };
+	};
+
+	class Scene_W4_CarScene final : public Scene
+	{
+	public:
+		Scene_W4_CarScene() = default;
+		~Scene_W4_CarScene() override = default;
+
+		Scene_W4_CarScene(const Scene_W4_CarScene&) = delete;
+		Scene_W4_CarScene(Scene_W4_CarScene&&) noexcept = delete;
+		Scene_W4_CarScene& operator=(const Scene_W4_CarScene&) = delete;
+		Scene_W4_CarScene& operator=(Scene_W4_CarScene&&) noexcept = delete;
 
 		void Initialize() override;
 		void Update(Timer* pTimer) override;
